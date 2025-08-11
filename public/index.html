@@ -77,88 +77,75 @@
     
     
   </strong>
- <span> • 930 words</span>
- <span> • 5 minute read</span>
+ <span> • 738 words</span>
+ <span> • 4 minute read</span>
   
 </div>
 
   <div class="content">
-    <p><p>User: 服务网格和边车模式什么意思
-Kimi: 简单来说，<strong>边车模式（Sidecar Pattern）</strong> 是一种设计思想，而 <strong>服务网格（Service Mesh）</strong> 是这种模式在大规模微服务场景下的完整实践。</p>
-<ol>
-<li>
-<p><strong>边车模式</strong><br>
-把日志收集、流量控制、服务注册、熔断限流等“控制类”功能从业务代码里抽出来，放到一个独立的进程/容器里（就像摩托车边斗），让它跟主服务一起启动、一起销毁。主服务专心写业务逻辑，所有“杂活”都交给这个 Sidecar 去做，实现“控制与业务”解耦。</p>
-</li>
-<li>
-<p><strong>服务网格</strong><br>
-当系统有成百上千个微服务时，每个服务都配一个 Sidecar 代理，它们彼此连成一个网状结构，就形成了 Service Mesh。<br>
-• <strong>数据平面</strong>：所有 Sidecar 代理，负责实际转发流量、做限流、熔断、加密、指标收集等。<br>
-• <strong>控制平面</strong>：集中下发配置和策略，告诉每个 Sidecar 该怎么转发、限流、路由等。<br>
-这样，开发者只需要写业务代码，其余网络通信、可观测性、安全等能力都由服务网格统一提供，且对应用“零侵入”。</p>
-</li>
-</ol>
-<p>一句话总结：<strong>边车模式是“给每个服务配一个助手”，服务网格则是“给所有助手连成一个智能网络”</strong>。
-User: 在 go 后端服务里，边车模式是怎么和业务代码工作的？需要 go 服务开放某一个统一的端口吗
-Kimi: 在 Go 后端服务里，<strong>边车模式（Sidecar）</strong> 的典型工作方式可以概括为一句话：</p>
-<blockquote>
-<p><strong>主服务只负责业务逻辑，边车容器作为反向代理负责流量入口、认证、限流等控制逻辑，两者通过本地网络（localhost）通信。</strong></p></blockquote>
-<hr>
-<h3 id="一具体工作流程以-go-为例">一、具体工作流程（以 Go 为例）</h3>
-<h4 id="1-主服务只开放一个业务端口">1. 主服务：只开放一个业务端口</h4>
-<p>你的 Go 服务仅需像往常一样监听一个本地端口（如 <code>:8080</code>），专注于处理业务请求，<strong>不需要关心认证、日志、限流等控制功能</strong>。</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#75715e">// main.go</span>
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">r</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">gin</span>.<span style="color:#a6e22e">Default</span>()
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">r</span>.<span style="color:#a6e22e">GET</span>(<span style="color:#e6db74">&#34;/ping&#34;</span>, <span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">c</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">gin</span>.<span style="color:#a6e22e">Context</span>) {
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">JSON</span>(<span style="color:#ae81ff">200</span>, <span style="color:#a6e22e">gin</span>.<span style="color:#a6e22e">H</span>{<span style="color:#e6db74">&#34;message&#34;</span>: <span style="color:#e6db74">&#34;pong&#34;</span>})
-</span></span><span style="display:flex;"><span>})
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">r</span>.<span style="color:#a6e22e">Run</span>(<span style="color:#e6db74">&#34;:8080&#34;</span>)
-</span></span></code></pre></div><h4 id="2-sidecar作为反向代理监听另一个端口">2. Sidecar：作为反向代理监听另一个端口</h4>
-<p>Sidecar 也是一个独立的 Go 程序（或 Envoy、Nginx 等），监听另一个端口（如 <code>:8081</code>），所有外部流量先打到 Sidecar，再由它转发给主服务。</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#75715e">// sidecar.go</span>
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">r</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">gin</span>.<span style="color:#a6e22e">Default</span>()
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">r</span>.<span style="color:#a6e22e">Any</span>(<span style="color:#e6db74">&#34;/*proxyPath&#34;</span>, <span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">c</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">gin</span>.<span style="color:#a6e22e">Context</span>) {
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">remote</span>, <span style="color:#a6e22e">_</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">url</span>.<span style="color:#a6e22e">Parse</span>(<span style="color:#e6db74">&#34;http://localhost:8080&#34;</span>) <span style="color:#75715e">// 主服务地址</span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">proxy</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">httputil</span>.<span style="color:#a6e22e">NewSingleHostReverseProxy</span>(<span style="color:#a6e22e">remote</span>)
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">proxy</span>.<span style="color:#a6e22e">ServeHTTP</span>(<span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">Writer</span>, <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">Request</span>)
-</span></span><span style="display:flex;"><span>})
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">r</span>.<span style="color:#a6e22e">Run</span>(<span style="color:#e6db74">&#34;:8081&#34;</span>)
-</span></span></code></pre></div><hr>
-<h3 id="二端口和部署说明">二、端口和部署说明</h3>
-<table>
-  <thead>
-      <tr>
-          <th>组件</th>
-          <th>作用</th>
-          <th>监听端口</th>
-          <th>暴露方式</th>
-      </tr>
-  </thead>
-  <tbody>
-      <tr>
-          <td>主服务</td>
-          <td>业务逻辑</td>
-          <td><code>:8080</code></td>
-          <td>仅本地（不对外）</td>
-      </tr>
-      <tr>
-          <td>Sidecar</td>
-          <td>控制逻辑+流量入口</td>
-          <td><code>:8081</code></td>
-          <td>对外暴露</td>
-      </tr>
-  </tbody>
-</table>
+    <p><h3 id="服务网格和边车模式什么意思">服务网格和边车模式什么意思？</h3>
 <ul>
-<li><strong>Kubernetes 部署时</strong>：两个容器放在同一个 Pod，共享网络命名空间，因此主服务只需监听 <code>localhost:8080</code>，Sidecar 通过 <code>http://localhost:8080</code> 即可访问主服务。</li>
-<li><strong>服务网格（如 Istio）场景</strong>：你甚至不需要手写 Sidecar，Istio 会自动注入 Envoy 作为 Sidecar，自动拦截并转发流量，Go 服务只需监听 <code>localhost:8080</code> 即可。</li>
+<li>
+<p>边车模式（Sidecar Pattern）</p>
+<ul>
+<li>将日志、流量控制、服务注册、熔断限流等“控制类”能力，从业务进程中剥离到独立的边车进程/容器，与主服务同生命周期运行。</li>
+<li>好处：业务与控制解耦，主服务只写业务逻辑。</li>
 </ul>
-<hr>
-<h3 id="三总结一句">三、总结一句</h3>
-<p><strong>Go 服务不需要做任何特殊改造，只需像往常一样监听本地端口（如 <code>:8080</code>），Sidecar 会作为独立进程/容器监听另一个端口（如 <code>:8081</code>）并代理所有流量。</strong>
-User: 8080 这个端口是跟 sidecar 约定的吗？如果没有约定端口，sidecar 是怎么跟go服务通信的呢
-Kimi: 不是“天然约定”，而是<strong>部署时显式声明</strong>的。<br>
-Sidecar 能跟 Go 服务通信，是因为在同一 Pod（或同一主机网络）里，<strong>你或运维把主服务监听的端口告诉了 Sidecar</strong>。如果没人告诉它，它就找不到。</p></p>
+</li>
+<li>
+<p>服务网格（Service Mesh）</p>
+<ul>
+<li>在大规模微服务中，为每个服务配一个边车代理，所有边车组成网状网络。</li>
+<li>数据平面：各个 sidecar 处理转发、限流、熔断、TLS、可观测性等。</li>
+<li>控制平面：集中下发策略与配置，统一路由、限流、流量治理等。</li>
+<li>对应用零侵入，开发只写业务。</li>
+</ul>
+</li>
+<li>
+<p>一句话：边车模式是“给每个服务配助手”，服务网格是“让所有助手组成智能网络”。</p>
+</li>
+</ul>
+<h3 id="在-go-后端服务里边车模式怎么和业务代码工作需要开放统一端口吗">在 Go 后端服务里，边车模式怎么和业务代码工作？需要开放统一端口吗？</h3>
+<ul>
+<li>典型方式：主服务监听本地端口（如 <code>:8080</code>），sidecar 作为反向代理监听对外端口（如 <code>:8081</code>），两者通过 <code>localhost</code> 通信。</li>
+<li>Go 主服务仅需像平时一样启动 HTTP 服务，不需要关心认证、限流、日志等控制逻辑。</li>
+</ul>
+<p>示例（主服务，仅处理业务）：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#f92672">package</span> <span style="color:#a6e22e">main</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> (
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;log&#34;</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;net/http&#34;</span>
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">mux</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">NewServeMux</span>()
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">mux</span>.<span style="color:#a6e22e">HandleFunc</span>(<span style="color:#e6db74">&#34;/ping&#34;</span>, <span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">w</span> <span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">ResponseWriter</span>, <span style="color:#a6e22e">r</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">Request</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">w</span>.<span style="color:#a6e22e">Write</span>([]byte(<span style="color:#e6db74">&#34;pong&#34;</span>))
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">log</span>.<span style="color:#a6e22e">Println</span>(<span style="color:#e6db74">&#34;app listening on :8080&#34;</span>)
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">ListenAndServe</span>(<span style="color:#e6db74">&#34;:8080&#34;</span>, <span style="color:#a6e22e">mux</span>)
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>示例（sidecar，反向代理到主服务）：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#f92672">package</span> <span style="color:#a6e22e">main</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> (
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;net/http&#34;</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;net/http/httputil&#34;</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;net/url&#34;</span>
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">target</span>, <span style="color:#a6e22e">_</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">url</span>.<span style="color:#a6e22e">Parse</span>(<span style="color:#e6db74">&#34;http://127.0.0.1:8080&#34;</span>)
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">proxy</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">httputil</span>.<span style="color:#a6e22e">NewSingleHostReverseProxy</span>(<span style="color:#a6e22e">target</span>)
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">ListenAndServe</span>(<span style="color:#e6db74">&#34;:8081&#34;</span>, <span style="color:#a6e22e">proxy</span>)
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><ul>
+<li>在 Kubernetes 中，二者位于同一 Pod，共享网络命名空间，sidecar 直接转发到 <code>127.0.0.1:8080</code>。</li>
+<li>使用服务网格（如 Istio）时，Envoy 会自动作为 sidecar 注入并接管流量，Go 服务只需监听本地端口。</li>
+</ul>
+<h3 id="8080-是跟-sidecar-约定的吗如果没有约定端口sidecar-怎么跟-go-服务通信">8080 是跟 sidecar 约定的吗？如果没有约定端口，sidecar 怎么跟 Go 服务通信？</h3>
+<p>不是“天然约定”，而是部署时显式声明。常见方式：</p></p>
     
       <a href="http://localhost:1313/posts/other/ai%E5%AF%B9%E8%AF%9D-%E8%BE%B9%E8%BD%A6%E6%A8%A1%E5%BC%8F%E5%92%8C%E6%9C%8D%E5%8A%A1%E7%BD%91%E6%A0%BC/">Read more...</a>
     
