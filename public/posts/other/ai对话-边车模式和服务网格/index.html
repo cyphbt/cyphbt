@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta
+    name="description"
+    content=""
+  />
+  
+    
+      <title>AI对话-边车模式和服务网格 | cyp&#39;s Blog</title>
+    
+  
+  <link rel="stylesheet" href="/css/reset.css"/>
+  <link rel="stylesheet" href="/css/font.css"/>
+  <link rel="stylesheet" href="/css/smigle.css"/>
+  
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+  <meta name="msapplication-TileColor" content="#da532c">
+  <meta name="theme-color" content="#ffffff">
+</head>
+
+  <body>
+    <div id="root">
+      <header>
+  <div id="brand">
+    <a class="icon-link" href="http://localhost:1313/">
+      <img
+        class="icon"
+        src="/images/brandIcon.svg"
+      />
+    </a>
+    <div class="text">
+      <a href="http://localhost:1313/"><h1>cyp&#39;s Blog</h1></a>
+      <h3>Description about Blog Author</h3>
+    </div>
+  </div>
+  <nav>
+    
+  </nav>
+  <hr />
+</header>
+
+      <div id="content">
+        
+  <main>
+    <article>
+      <h1 class="title">AI对话-边车模式和服务网格</h1>
+      
+      <div class="post-meta">
+  <strong>
+    <span>Posted on</span>
+    <time>2025-08-11 16:41:26</time>
+    
+    
+  </strong>
+  <span> • 930 words</span>
+  <span> • 5 minute read</span>
+  
+  
+</div>
+
+      <div class="content"><p>User: 服务网格和边车模式什么意思
+Kimi: 简单来说，<strong>边车模式（Sidecar Pattern）</strong> 是一种设计思想，而 <strong>服务网格（Service Mesh）</strong> 是这种模式在大规模微服务场景下的完整实践。</p>
+<ol>
+<li>
+<p><strong>边车模式</strong><br>
+把日志收集、流量控制、服务注册、熔断限流等“控制类”功能从业务代码里抽出来，放到一个独立的进程/容器里（就像摩托车边斗），让它跟主服务一起启动、一起销毁。主服务专心写业务逻辑，所有“杂活”都交给这个 Sidecar 去做，实现“控制与业务”解耦。</p>
+</li>
+<li>
+<p><strong>服务网格</strong><br>
+当系统有成百上千个微服务时，每个服务都配一个 Sidecar 代理，它们彼此连成一个网状结构，就形成了 Service Mesh。<br>
+• <strong>数据平面</strong>：所有 Sidecar 代理，负责实际转发流量、做限流、熔断、加密、指标收集等。<br>
+• <strong>控制平面</strong>：集中下发配置和策略，告诉每个 Sidecar 该怎么转发、限流、路由等。<br>
+这样，开发者只需要写业务代码，其余网络通信、可观测性、安全等能力都由服务网格统一提供，且对应用“零侵入”。</p>
+</li>
+</ol>
+<p>一句话总结：<strong>边车模式是“给每个服务配一个助手”，服务网格则是“给所有助手连成一个智能网络”</strong>。
+User: 在 go 后端服务里，边车模式是怎么和业务代码工作的？需要 go 服务开放某一个统一的端口吗
+Kimi: 在 Go 后端服务里，<strong>边车模式（Sidecar）</strong> 的典型工作方式可以概括为一句话：</p>
+<blockquote>
+<p><strong>主服务只负责业务逻辑，边车容器作为反向代理负责流量入口、认证、限流等控制逻辑，两者通过本地网络（localhost）通信。</strong></p></blockquote>
+<hr>
+<h3 id="一具体工作流程以-go-为例">一、具体工作流程（以 Go 为例）</h3>
+<h4 id="1-主服务只开放一个业务端口">1. 主服务：只开放一个业务端口</h4>
+<p>你的 Go 服务仅需像往常一样监听一个本地端口（如 <code>:8080</code>），专注于处理业务请求，<strong>不需要关心认证、日志、限流等控制功能</strong>。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#75715e">// main.go</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">r</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">gin</span>.<span style="color:#a6e22e">Default</span>()
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">r</span>.<span style="color:#a6e22e">GET</span>(<span style="color:#e6db74">&#34;/ping&#34;</span>, <span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">c</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">gin</span>.<span style="color:#a6e22e">Context</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">JSON</span>(<span style="color:#ae81ff">200</span>, <span style="color:#a6e22e">gin</span>.<span style="color:#a6e22e">H</span>{<span style="color:#e6db74">&#34;message&#34;</span>: <span style="color:#e6db74">&#34;pong&#34;</span>})
+</span></span><span style="display:flex;"><span>})
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">r</span>.<span style="color:#a6e22e">Run</span>(<span style="color:#e6db74">&#34;:8080&#34;</span>)
+</span></span></code></pre></div><h4 id="2-sidecar作为反向代理监听另一个端口">2. Sidecar：作为反向代理监听另一个端口</h4>
+<p>Sidecar 也是一个独立的 Go 程序（或 Envoy、Nginx 等），监听另一个端口（如 <code>:8081</code>），所有外部流量先打到 Sidecar，再由它转发给主服务。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#75715e">// sidecar.go</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">r</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">gin</span>.<span style="color:#a6e22e">Default</span>()
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">r</span>.<span style="color:#a6e22e">Any</span>(<span style="color:#e6db74">&#34;/*proxyPath&#34;</span>, <span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">c</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">gin</span>.<span style="color:#a6e22e">Context</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">remote</span>, <span style="color:#a6e22e">_</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">url</span>.<span style="color:#a6e22e">Parse</span>(<span style="color:#e6db74">&#34;http://localhost:8080&#34;</span>) <span style="color:#75715e">// 主服务地址</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">proxy</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">httputil</span>.<span style="color:#a6e22e">NewSingleHostReverseProxy</span>(<span style="color:#a6e22e">remote</span>)
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">proxy</span>.<span style="color:#a6e22e">ServeHTTP</span>(<span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">Writer</span>, <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">Request</span>)
+</span></span><span style="display:flex;"><span>})
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">r</span>.<span style="color:#a6e22e">Run</span>(<span style="color:#e6db74">&#34;:8081&#34;</span>)
+</span></span></code></pre></div><hr>
+<h3 id="二端口和部署说明">二、端口和部署说明</h3>
+<table>
+  <thead>
+      <tr>
+          <th>组件</th>
+          <th>作用</th>
+          <th>监听端口</th>
+          <th>暴露方式</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>主服务</td>
+          <td>业务逻辑</td>
+          <td><code>:8080</code></td>
+          <td>仅本地（不对外）</td>
+      </tr>
+      <tr>
+          <td>Sidecar</td>
+          <td>控制逻辑+流量入口</td>
+          <td><code>:8081</code></td>
+          <td>对外暴露</td>
+      </tr>
+  </tbody>
+</table>
+<ul>
+<li><strong>Kubernetes 部署时</strong>：两个容器放在同一个 Pod，共享网络命名空间，因此主服务只需监听 <code>localhost:8080</code>，Sidecar 通过 <code>http://localhost:8080</code> 即可访问主服务。</li>
+<li><strong>服务网格（如 Istio）场景</strong>：你甚至不需要手写 Sidecar，Istio 会自动注入 Envoy 作为 Sidecar，自动拦截并转发流量，Go 服务只需监听 <code>localhost:8080</code> 即可。</li>
+</ul>
+<hr>
+<h3 id="三总结一句">三、总结一句</h3>
+<p><strong>Go 服务不需要做任何特殊改造，只需像往常一样监听本地端口（如 <code>:8080</code>），Sidecar 会作为独立进程/容器监听另一个端口（如 <code>:8081</code>）并代理所有流量。</strong>
+User: 8080 这个端口是跟 sidecar 约定的吗？如果没有约定端口，sidecar 是怎么跟go服务通信的呢
+Kimi: 不是“天然约定”，而是<strong>部署时显式声明</strong>的。<br>
+Sidecar 能跟 Go 服务通信，是因为在同一 Pod（或同一主机网络）里，<strong>你或运维把主服务监听的端口告诉了 Sidecar</strong>。如果没人告诉它，它就找不到。</p>
+<p>具体有三种常见做法：</p>
+<ol>
+<li>
+<p><strong>环境变量</strong><br>
+Kubernetes 的 Downward API 或 Helm chart 里把端口写成环境变量，Sidecar 启动时读这个变量，例如：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-yaml" data-lang="yaml"><span style="display:flex;"><span><span style="color:#f92672">env</span>:
+</span></span><span style="display:flex;"><span>- <span style="color:#f92672">name</span>: <span style="color:#ae81ff">APP_PORT</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">value</span>: <span style="color:#e6db74">&#34;8080&#34;</span>
+</span></span></code></pre></div><p>Sidecar 里用 <code>os.Getenv(&quot;APP_PORT&quot;)</code> 就知道往哪转发。</p>
+</li>
+<li>
+<p><strong>固定配置</strong><br>
+直接写死在 Sidecar 的启动参数或配置文件里，例如 Envoy 的 bootstrap 配置：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-yaml" data-lang="yaml"><span style="display:flex;"><span><span style="color:#f92672">clusters</span>:
+</span></span><span style="display:flex;"><span>- <span style="color:#f92672">name</span>: <span style="color:#ae81ff">app</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">load_assignment</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">endpoints</span>:
+</span></span><span style="display:flex;"><span>    - <span style="color:#f92672">lb_endpoints</span>:
+</span></span><span style="display:flex;"><span>      - <span style="color:#f92672">endpoint</span>:
+</span></span><span style="display:flex;"><span>          <span style="color:#f92672">address</span>:
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">socket_address</span>: { <span style="color:#f92672">address: 127.0.0.1, port_value</span>: <span style="color:#ae81ff">8080</span> }
+</span></span></code></pre></div></li>
+<li>
+<p><strong>服务发现 / 约定俗成</strong><br>
+公司规定所有业务容器都监听 <code>8080</code>，Sidecar 默认就转发到 <code>localhost:8080</code>，无需再配。<br>
+但这仍是“人事先约定”，不是系统默认。</p>
+</li>
+</ol>
+<p>如果既没变量也没配置，Sidecar 只能“抓瞎”，无法自动猜到主服务端口——它不会扫描本地端口，也不会分析你的 Go 代码。
+User: 同一个pod里的程序，除了通过端口通信，还能通过什么通信
+Kimi: 在同一个 Pod 里，两个容器共享：</p>
+<ol>
+<li>
+<p><strong>网络命名空间</strong><br>
+因此最常用、最简单、最稳定的就是“127.0.0.1 + 固定端口”的 <strong>TCP/UDP/HTTP 套接字</strong> 通信，这也是 Sidecar 与业务容器之间的主流做法。</p>
+</li>
+<li>
+<p><strong>IPC（进程间通信）命名空间</strong><br>
+共享 IPC 命名空间意味着可以使用</p>
+<ul>
+<li><strong>Unix Domain Socket</strong>（UDS）</li>
+<li><strong>共享内存（shm）</strong></li>
+<li><strong>System V / POSIX 信号量、消息队列</strong></li>
+</ul>
+<p>但这些方式要求两个进程都显式地创建/挂载同一路径或 shm ID；在 Kubernetes 场景中必须额外挂载 <code>emptyDir</code> 卷来保存 UDS 文件，否则容器重启后路径会消失，因此用得很少。</p>
+</li>
+<li>
+<p><strong>挂载卷（Volume）</strong><br>
+Pod 内的所有容器共享同一份卷（<code>emptyDir</code>、<code>hostPath</code>、<code>configMap</code>、<code>secret</code> 等），可以通过</p>
+<ul>
+<li><strong>读写同一个文件/管道（FIFO）</strong></li>
+<li><strong>监听 inotify 事件</strong><br>
+来做“通信”，但属于“异步批量”而非实时 RPC，通常只用于配置热载、日志采集。</li>
+</ul>
+</li>
+<li>
+<p><strong>进程信号</strong><br>
+业务容器可通过 <code>kill -USR1 &lt;sidecar-pid&gt;</code> 等方式给 Sidecar 发信号；需要 Sidecar 以 root 或共享 PID 命名空间运行，且只能传递非常简单的信号信息，不能传业务数据。</p>
+</li>
+</ol>
+<p>总结：</p>
+<ul>
+<li><strong>生产里最可靠的仍是“localhost + 端口”</strong>。</li>
+<li>其他方式（UDS、共享内存、文件卷、信号）要么配置复杂，要么只能传少量/异步数据，一般只在特殊场景（高性能、零拷贝、热更新）才会考虑。
+User: Unix Domain Socket 具体怎么用？
+Kimi: 下面给出一个<strong>最小可运行示例</strong>，演示「Go 主服务」+「Go Sidecar」如何在同一个 Kubernetes Pod 内通过 <strong>Unix Domain Socket (UDS)</strong> 通信。思路完全通用，裸机或 Docker 也能照抄。</li>
+</ul>
+<hr>
+<h3 id="1-原理回顾">1. 原理回顾</h3>
+<ul>
+<li>UDS 在文件系统里表现为一个“特殊文件”（inode），路径形如 <code>/tmp/app.sock</code>。</li>
+<li>只要两个进程都挂在同一路径，就能像 TCP 一样 <code>accept / dial</code>。</li>
+<li>在 Kubernetes 里，需要把同一个 <code>emptyDir</code> 卷挂到两个容器的相同路径，否则容器重启会丢失 socket 文件。</li>
+</ul>
+<hr>
+<h3 id="2-目录结构">2. 目录结构</h3>
+<pre tabindex="0"><code>.
+├── Dockerfile.busybox   # 主服务镜像
+├── Dockerfile.sidecar   # Sidecar 镜像
+├── main.go              # 主服务
+├── sidecar.go           # Sidecar
+└── pod.yaml             # 部署
+</code></pre><hr>
+<h3 id="3-代码示例">3. 代码示例</h3>
+<h4 id="31-主服务-maingo">3.1 主服务 main.go</h4>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#f92672">package</span> <span style="color:#a6e22e">main</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> (
+</span></span><span style="display:flex;"><span>	<span style="color:#e6db74">&#34;net&#34;</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#e6db74">&#34;net/http&#34;</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#e6db74">&#34;log&#34;</span>
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// 确保目录存在</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">sockPath</span> <span style="color:#f92672">:=</span> <span style="color:#e6db74">&#34;/sock/app.sock&#34;</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">_</span> = <span style="color:#a6e22e">os</span>.<span style="color:#a6e22e">Remove</span>(<span style="color:#a6e22e">sockPath</span>)          <span style="color:#75715e">// 清理旧文件</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">l</span>, <span style="color:#a6e22e">err</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">net</span>.<span style="color:#a6e22e">Listen</span>(<span style="color:#e6db74">&#34;unix&#34;</span>, <span style="color:#a6e22e">sockPath</span>)
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">err</span> <span style="color:#f92672">!=</span> <span style="color:#66d9ef">nil</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">log</span>.<span style="color:#a6e22e">Fatal</span>(<span style="color:#a6e22e">err</span>)
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">defer</span> <span style="color:#a6e22e">l</span>.<span style="color:#a6e22e">Close</span>()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">mux</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">NewServeMux</span>()
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">mux</span>.<span style="color:#a6e22e">HandleFunc</span>(<span style="color:#e6db74">&#34;/ping&#34;</span>, <span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">w</span> <span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">ResponseWriter</span>, <span style="color:#a6e22e">r</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">Request</span>) {
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">w</span>.<span style="color:#a6e22e">Write</span>([]byte(<span style="color:#e6db74">&#34;pong from app&#34;</span>))
+</span></span><span style="display:flex;"><span>	})
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">log</span>.<span style="color:#a6e22e">Println</span>(<span style="color:#e6db74">&#34;app listening on&#34;</span>, <span style="color:#a6e22e">sockPath</span>)
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">Serve</span>(<span style="color:#a6e22e">l</span>, <span style="color:#a6e22e">mux</span>)
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h4 id="32-sidecar-sidecargo">3.2 Sidecar sidecar.go</h4>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#f92672">package</span> <span style="color:#a6e22e">main</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> (
+</span></span><span style="display:flex;"><span>	<span style="color:#e6db74">&#34;io&#34;</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#e6db74">&#34;net&#34;</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#e6db74">&#34;net/http&#34;</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#e6db74">&#34;log&#34;</span>
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">sockPath</span> <span style="color:#f92672">:=</span> <span style="color:#e6db74">&#34;/sock/app.sock&#34;</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">client</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">Client</span>{
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">Transport</span>: <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">http</span>.<span style="color:#a6e22e">Transport</span>{
+</span></span><span style="display:flex;"><span>			<span style="color:#a6e22e">Dial</span>: <span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">_</span>, <span style="color:#a6e22e">_</span> <span style="color:#66d9ef">string</span>) (<span style="color:#a6e22e">net</span>.<span style="color:#a6e22e">Conn</span>, <span style="color:#66d9ef">error</span>) {
+</span></span><span style="display:flex;"><span>				<span style="color:#66d9ef">return</span> <span style="color:#a6e22e">net</span>.<span style="color:#a6e22e">Dial</span>(<span style="color:#e6db74">&#34;unix&#34;</span>, <span style="color:#a6e22e">sockPath</span>)
+</span></span><span style="display:flex;"><span>			},
+</span></span><span style="display:flex;"><span>		},
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">resp</span>, <span style="color:#a6e22e">err</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">client</span>.<span style="color:#a6e22e">Get</span>(<span style="color:#e6db74">&#34;http://unix/ping&#34;</span>) <span style="color:#75715e">// 伪 URL，仅占位</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> <span style="color:#a6e22e">err</span> <span style="color:#f92672">!=</span> <span style="color:#66d9ef">nil</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">log</span>.<span style="color:#a6e22e">Fatal</span>(<span style="color:#a6e22e">err</span>)
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">defer</span> <span style="color:#a6e22e">resp</span>.<span style="color:#a6e22e">Body</span>.<span style="color:#a6e22e">Close</span>()
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">body</span>, <span style="color:#a6e22e">_</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">io</span>.<span style="color:#a6e22e">ReadAll</span>(<span style="color:#a6e22e">resp</span>.<span style="color:#a6e22e">Body</span>)
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">log</span>.<span style="color:#a6e22e">Println</span>(<span style="color:#e6db74">&#34;sidecar got:&#34;</span>, string(<span style="color:#a6e22e">body</span>))
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><hr>
+<h3 id="4-镜像dockerfile-片段">4. 镜像（Dockerfile 片段）</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-dockerfile" data-lang="dockerfile"><span style="display:flex;"><span><span style="color:#75715e"># Dockerfile.busybox</span><span style="color:#960050;background-color:#1e0010">
+</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">FROM</span><span style="color:#e6db74"> golang:1.22-alpine AS build</span><span style="color:#960050;background-color:#1e0010">
+</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">COPY</span> main.go .<span style="color:#960050;background-color:#1e0010">
+</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">RUN</span> go build -o app main.go<span style="color:#960050;background-color:#1e0010">
+</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010">
+</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">FROM</span><span style="color:#e6db74"> alpine</span><span style="color:#960050;background-color:#1e0010">
+</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">COPY</span> --from<span style="color:#f92672">=</span>build /app /app<span style="color:#960050;background-color:#1e0010">
+</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">ENTRYPOINT</span> [<span style="color:#e6db74">&#34;/app&#34;</span>]<span style="color:#960050;background-color:#1e0010">
+</span></span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-dockerfile" data-lang="dockerfile"><span style="display:flex;"><span><span style="color:#75715e"># Dockerfile.sidecar</span><span style="color:#960050;background-color:#1e0010">
+</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">FROM</span><span style="color:#e6db74"> golang:1.22-alpine AS build</span><span style="color:#960050;background-color:#1e0010">
+</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">COPY</span> sidecar.go .<span style="color:#960050;background-color:#1e0010">
+</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">RUN</span> go build -o sidecar sidecar.go<span style="color:#960050;background-color:#1e0010">
+</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010">
+</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">FROM</span><span style="color:#e6db74"> alpine</span><span style="color:#960050;background-color:#1e0010">
+</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">COPY</span> --from<span style="color:#f92672">=</span>build /sidecar /sidecar<span style="color:#960050;background-color:#1e0010">
+</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">ENTRYPOINT</span> [<span style="color:#e6db74">&#34;/sidecar&#34;</span>]<span style="color:#960050;background-color:#1e0010">
+</span></span></span></code></pre></div><hr>
+<h3 id="5-kubernetes-部署-podyaml">5. Kubernetes 部署 pod.yaml</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-yaml" data-lang="yaml"><span style="display:flex;"><span><span style="color:#f92672">apiVersion</span>: <span style="color:#ae81ff">v1</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">kind</span>: <span style="color:#ae81ff">Pod</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">metadata</span>:
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">name</span>: <span style="color:#ae81ff">app-with-sidecar</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">spec</span>:
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">volumes</span>:
+</span></span><span style="display:flex;"><span>  - <span style="color:#f92672">name</span>: <span style="color:#ae81ff">sockdir</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">emptyDir</span>: {}
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">containers</span>:
+</span></span><span style="display:flex;"><span>  - <span style="color:#f92672">name</span>: <span style="color:#ae81ff">app</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">image</span>: <span style="color:#ae81ff">myrepo/app</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">volumeMounts</span>:
+</span></span><span style="display:flex;"><span>    - <span style="color:#f92672">name</span>: <span style="color:#ae81ff">sockdir</span>
+</span></span><span style="display:flex;"><span>      <span style="color:#f92672">mountPath</span>: <span style="color:#ae81ff">/sock</span>
+</span></span><span style="display:flex;"><span>  - <span style="color:#f92672">name</span>: <span style="color:#ae81ff">sidecar</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">image</span>: <span style="color:#ae81ff">myrepo/sidecar</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">volumeMounts</span>:
+</span></span><span style="display:flex;"><span>    - <span style="color:#f92672">name</span>: <span style="color:#ae81ff">sockdir</span>
+</span></span><span style="display:flex;"><span>      <span style="color:#f92672">mountPath</span>: <span style="color:#ae81ff">/sock</span>
+</span></span></code></pre></div><hr>
+<h3 id="6-运行与验证">6. 运行与验证</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>kubectl apply -f pod.yaml
+</span></span><span style="display:flex;"><span>kubectl logs app-with-sidecar -c sidecar
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># 日志应输出：sidecar got: pong from app</span>
+</span></span></code></pre></div><hr>
+<h3 id="7-常见坑">7. 常见坑</h3>
+<table>
+  <thead>
+      <tr>
+          <th>问题</th>
+          <th>解决</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>socket 文件残留导致 <code>bind: address already in use</code></td>
+          <td>启动前 <code>os.Remove(sockPath)</code></td>
+      </tr>
+      <tr>
+          <td>SELinux / AppArmor 阻止容器写入 <code>/tmp</code></td>
+          <td>挂 <code>emptyDir</code> 或 <code>/tmp</code> 加 <code>:Z</code> 标签</td>
+      </tr>
+      <tr>
+          <td>路径不一致</td>
+          <td>两容器必须挂载到同一个卷路径（如 <code>/sock</code>）</td>
+      </tr>
+  </tbody>
+</table>
+<hr>
+<p>一句话总结：<br>
+Unix Domain Socket 在 Go 里就是 <code>net.Listen(&quot;unix&quot;, &quot;/xxx/yyy.sock&quot;)</code> 与 <code>net.Dial(&quot;unix&quot;, &quot;/xxx/yyy.sock&quot;)</code>，只要两进程共享同一路径即可，Pod 内用 <code>emptyDir</code> 卷最方便。
+User: 为什么我直接 go run app.go 运行下面的代码，提示我这个错误
+package main</p>
+<p>import (
+&ldquo;log&rdquo;
+&ldquo;net&rdquo;
+&ldquo;net/http&rdquo;
+&ldquo;os&rdquo;
+)</p>
+<p>func main() {
+// 确保目录存在
+sockPath := &ldquo;/sock/app.sock&rdquo;
+_ = os.Remove(sockPath) // 清理旧文件
+l, err := net.Listen(&ldquo;unix&rdquo;, sockPath)
+if err != nil {
+log.Fatal(err)
+}
+defer l.Close()</p>
+<pre><code>mux := http.NewServeMux()
+mux.HandleFunc(&quot;/ping&quot;, func(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte(&quot;pong from app&quot;))
+})
+log.Println(&quot;app listening on&quot;, sockPath)
+http.Serve(l, mux)
+</code></pre>
+<p>}</p>
+<p>go: <a href="mailto:git.100tal.com/tal_ucenter_sdk/ucenter_go@v1.19.2">git.100tal.com/tal_ucenter_sdk/ucenter_go@v1.19.2</a>: missing go.sum entry for go.mod file; to add it:
+go mod download git.100tal.com/tal_ucenter_sdk/ucenter_go
+Kimi: 报错的根源并不是 Unix Domain Socket，而是 <strong>Go Modules 校验失败</strong>——你的 <code>go.mod</code> 里依赖了私有仓库 <code>git.100tal.com/tal_ucenter_sdk/ucenter_go@v1.19.2</code>，但本地既没有 <code>go.sum</code> 的校验和，也大概率没权限拉取该仓库，于是 <code>go run</code> 在自动下载依赖时失败了。</p>
+<p>解决办法按优先级：</p>
+<ol>
+<li>
+<p><strong>不需要该依赖</strong><br>
+把 <code>go.mod</code> 里 <code>require git.100tal.com/tal_ucenter_sdk/ucenter_go v1.19.2</code> 删掉，再执行</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>go mod tidy
+</span></span><span style="display:flex;"><span>go run app.go
+</span></span></code></pre></div><p>如果删不掉，说明代码里确实 import 了；那就继续看方案 2。</p>
+</li>
+<li>
+<p><strong>需要该依赖，但本地能访问私有仓库</strong><br>
+a. 配置 GOPRIVATE</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>go env -w GOPRIVATE<span style="color:#f92672">=</span>git.100tal.com
+</span></span></code></pre></div><p>b. 确保有权限（SSH key 或 HTTPS token）<br>
+c. 重新拉取</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>go mod download git.100tal.com/tal_ucenter_sdk/ucenter_go
+</span></span><span style="display:flex;"><span>go run app.go
+</span></span></code></pre></div></li>
+<li>
+<p><strong>需要该依赖，但本地无法访问</strong></p>
+<ul>
+<li>把私有仓库镜像到公司内网代理，或</li>
+<li>用 <code>replace</code> 指向本地已下载的目录：</li>
+</ul>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go.mod" data-lang="go.mod"><span style="display:flex;"><span>replace git.<span style="color:#ae81ff">100</span>tal.com<span style="color:#f92672">/</span>tal_ucenter_sdk<span style="color:#f92672">/</span>ucenter_go v1.<span style="color:#ae81ff">19.2</span> <span style="color:#f92672">=&gt;</span> ..<span style="color:#f92672">/</span>local<span style="color:#f92672">-</span>ucenter<span style="color:#f92672">-</span>go
+</span></span></code></pre></div></li>
+</ol>
+<p>总之，先把 <code>go.mod</code> 和 <code>go.sum</code> 整理干净，再运行你的 Unix Domain Socket 示例即可。
+User: 现在提示了这个错误
+2025/08/11 16:31:59 listen unix /sock/app.sock: bind: no such file or directory
+exit status 1
+Kimi: 报错信息</p>
+<pre tabindex="0"><code>listen unix /sock/app.sock: bind: no such file or directory
+</code></pre><p>的意思是：<strong>目录 <code>/sock</code> 根本不存在</strong>，所以 Go 无法在 <code>/sock/app.sock</code> 这个位置创建 socket 文件。</p>
+<hr>
+<h3 id="解决方法三选一按场景挑">解决方法（三选一，按场景挑）</h3>
+<h4 id="-1-临时本地跑手动建目录">✅ <strong>1. 临时本地跑：手动建目录</strong></h4>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>sudo mkdir -p /sock          <span style="color:#75715e"># 建目录</span>
+</span></span><span style="display:flex;"><span>sudo chmod <span style="color:#ae81ff">777</span> /sock         <span style="color:#75715e"># 让当前用户可写（或改成你自己的用户）</span>
+</span></span><span style="display:flex;"><span>go run app.go                <span style="color:#75715e"># 再跑</span>
+</span></span></code></pre></div><h4 id="-2-换个已有目录">✅ <strong>2. 换个已有目录</strong></h4>
+<p>把代码里的路径改成你本机一定存在的目录，比如 <code>/tmp</code>：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#a6e22e">sockPath</span> <span style="color:#f92672">:=</span> <span style="color:#e6db74">&#34;/tmp/app.sock&#34;</span>
+</span></span></code></pre></div><h4 id="-3-在容器--kubernetes-里跑">✅ <strong>3. 在容器 / Kubernetes 里跑</strong></h4>
+<p>如果你在容器里，确保把 <code>emptyDir</code> 卷挂到 <code>/sock</code>（如前面给的 pod.yaml），容器启动后目录自然就有，无需手动创建。</p>
+<hr>
+<p>一句话：<strong>目录必须先存在，Go 才能在里面创建 socket 文件</strong>。
+User: socket 文件是啥？可以随便创建一个吗？我在mac系统
+Kimi: 一句话先给结论：<br>
+<strong>socket 文件只是一个“长得像文件”的入口，进程启动时由内核自动创建，删掉即可，不需要手动“制作”。在 macOS 上也能随便用，只要路径在本地文件系统即可。</strong></p>
+<hr>
+<h3 id="1-socket-文件到底是什么">1. socket 文件到底是什么？</h3>
+<ul>
+<li>它不是普通数据文件，而是 <strong>Unix Domain Socket 的“门牌号”</strong> ——内核把它当成一个地址，谁连到这个文件节点，就等同于连到监听进程。</li>
+<li>进程退出或你手动 <code>rm</code> 后，文件节点就没了，对系统没任何副作用。</li>
+<li>与普通 TCP 端口相比，它只在<strong>本机</strong>有效，不经过网络协议栈，速度更快。</li>
+</ul>
+<hr>
+<h3 id="2-macos-的注意事项">2. macOS 的注意事项</h3>
+<p>macOS 的文件系统（APFS、HFS+）都支持 socket 节点，因此：</p>
+<ul>
+<li>任何可写目录都行： <code>/tmp</code>, <code>~/tmp</code>, <code>./sock/app.sock</code> …</li>
+<li><strong>不要</strong>放在 <strong>NFS / FUSE / Docker Desktop 的 osxfs 共享目录</strong>，这些文件系统不支持 UDS 或会报 <code>operation not permitted</code>。</li>
+</ul>
+<p>示例（在你的 repo 目录里跑即可）：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#75715e"># 先建目录</span>
+</span></span><span style="display:flex;"><span>mkdir -p ./sock
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># 改代码</span>
+</span></span><span style="display:flex;"><span>sockPath :<span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;./sock/app.sock&#34;</span>
+</span></span></code></pre></div><hr>
+<h3 id="3-小实验30-秒验证">3. 小实验（30 秒验证）</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#75715e"># 终端1</span>
+</span></span><span style="display:flex;"><span>go run app.go    <span style="color:#75715e"># 看到 &#34;app listening on ./sock/app.sock&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># 终端2</span>
+</span></span><span style="display:flex;"><span>curl --unix-socket ./sock/app.sock http://localhost/ping
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># 输出：pong from app</span>
+</span></span></code></pre></div><hr>
+<h3 id="4-清理">4. 清理</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>rm -f ./sock/app.sock
+</span></span></code></pre></div><p>就这么简单。</p>
+</div>
+    </article>
+  </main>
+
+      </div>
+      <footer>
+  <hr />
+  
+  <p class="copyright">
+    Copyright © 2025
+    <a href="http://localhost:1313/"><strong>Blog Author</strong></a>.
+    This work is licensed under the
+    <a href="http://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a> license.
+  </p>
+  <p class="builtWith">
+    Built with
+    <a href="http://www.gohugo.io/">Hugo</a>,
+    using the theme
+    <a href="https://gitlab.com/ian-s-mcb/smigle-hugo-theme">smigle</a>,
+    which was influenced by the theme
+    <a href="https://github.com/sumnerevans/smol">smol</a>.
+  </p>
+</footer>
+
+    </div>
+  </body>
+</html>
