@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta
+    name="description"
+    content=""
+  />
+  
+    
+      <title>AI对话-gitignore用法 | cyp&#39;s Blog</title>
+    
+  
+  <link rel="stylesheet" href="/css/reset.css"/>
+  <link rel="stylesheet" href="/css/font.css"/>
+  <link rel="stylesheet" href="/css/smigle.css"/>
+  
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+  <meta name="msapplication-TileColor" content="#da532c">
+  <meta name="theme-color" content="#ffffff">
+</head>
+
+  <body>
+    <div id="root">
+      <header>
+  <div id="brand">
+    <a class="icon-link" href="http://localhost:1313/">
+      <img
+        class="icon"
+        src="/images/brandIcon.svg"
+      />
+    </a>
+    <div class="text">
+      <a href="http://localhost:1313/"><h1>cyp&#39;s Blog</h1></a>
+      <h3>Description about Blog Author</h3>
+    </div>
+  </div>
+  <nav>
+    
+  </nav>
+  <hr />
+</header>
+
+      <div id="content">
+        
+  <main>
+    <article>
+      <h1 class="title">AI对话-gitignore用法</h1>
+      
+      <div class="post-meta">
+  <strong>
+    <span>Posted on</span>
+    <time>2025-08-11 17:22:26</time>
+    
+    
+  </strong>
+  <span> • 216 words</span>
+  <span> • 2 minute read</span>
+  
+  
+</div>
+
+      <div class="content"><h3 id="git-忽略-confconfini-未生效问题排查与修复指引">Git 忽略 <code>conf/conf.ini</code> 未生效问题排查与修复指引</h3>
+<h4 id="背景症状">背景/症状</h4>
+<ul>
+<li>你在 <code>.gitignore</code> 中已添加了 <code>conf/conf.ini</code> 的忽略规则，但 <code>git status</code> 仍显示该文件有变更。</li>
+</ul>
+<h4 id="根因">根因</h4>
+<ul>
+<li><code>.gitignore</code> 只对“未被跟踪”的文件生效。<code>conf/conf.ini</code> 之前已经被提交（被 Git 索引跟踪），因此忽略规则对它不起作用。</li>
+</ul>
+<h4 id="快速诊断">快速诊断</h4>
+<ul>
+<li>查看 <code>.gitignore</code> 中确有规则（多处重复无碍但冗余）</li>
+<li>确认文件已被跟踪：
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"></code></pre></div></li>
+</ul>
+<p>git ls-files conf/conf.ini</p>
+<pre tabindex="0"><code>若输出包含 `conf/conf.ini`，说明该文件已被跟踪。
+- 当前状态：
+```bash
+git status --porcelain
+</code></pre><p>会看到该文件被标记为修改（如 <code>M conf/conf.ini</code>）。</p>
+<h4 id="解决步骤">解决步骤</h4>
+<ol>
+<li>从 Git 索引中移除该文件，但保留本地文件：
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"></code></pre></div></li>
+</ol>
+<p>git rm &ndash;cached conf/conf.ini</p>
+<pre tabindex="0"><code>2. 之后 `.gitignore` 的忽略规则将开始生效。
+
+#### 验证
+- 再次查看状态：
+```bash
+git status
+</code></pre><p>会看到 <code>deleted: conf/conf.ini</code> 作为待提交变更（这表示从版本库删除，但不会删除你本地工作区文件）。</p>
+<h4 id="提交变更可选但推荐">提交变更（可选，但推荐）</h4>
+<ul>
+<li>提交索引移除操作，让团队成员也不再跟踪该文件：
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"></code></pre></div></li>
+</ul>
+<p>git commit -m &ldquo;chore: stop tracking conf/conf.ini and respect .gitignore&rdquo;</p>
+<pre tabindex="0"><code>- 推送到远端：
+```bash
+git push
+</code></pre><h4 id="gitignore-建议"><code>.gitignore</code> 建议</h4>
+<ul>
+<li>你当前的 <code>.gitignore</code> 对 <code>conf/conf.ini</code> 有多条重复规则（如 <code>conf/conf.ini</code>、<code>./conf/conf.ini</code>、<code>/conf/conf.ini</code> 等）。保持一条即可，推荐以下更明确写法：
+<pre tabindex="0"><code class="language-gitignore" data-lang="gitignore"></code></pre></li>
+</ul>
+<p>/conf/conf.ini</p>
+<pre tabindex="0"><code>- 保持规则简洁，避免重复，便于维护。
+
+#### 注意事项
+- `git rm --cached` 只移除索引跟踪，不会删除你本地文件内容。
+- 若该文件对运行必需，确保在 README 或示例中提供模板文件（例如 `conf/conf.ini.example`），并在启动流程中引导用户复制为实际配置文件。
+
+- - -
+
+- 关键点
+- 原因：文件已被 Git 跟踪，`.gitignore` 不生效
+- 处理：`git rm --cached conf/conf.ini`，然后提交
+- 建议：`.gitignore` 使用 `/conf/conf.ini`，清理重复规则
+
+```shellscript
+git ls-files conf/conf.ini
+</code></pre><pre tabindex="0"><code class="language-shellscript" data-lang="shellscript">git status --porcelain
+</code></pre><pre tabindex="0"><code class="language-shellscript" data-lang="shellscript">git rm --cached conf/conf.ini
+</code></pre><pre tabindex="0"><code class="language-shellscript" data-lang="shellscript">git status
+</code></pre><pre tabindex="0"><code class="language-shellscript" data-lang="shellscript">git commit -m &#34;chore: stop tracking conf/conf.ini and respect .gitignore&#34;
+</code></pre><pre tabindex="0"><code class="language-shellscript" data-lang="shellscript">git push
+</code></pre><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-plaintext" data-lang="plaintext"><span style="display:flex;"><span>/conf/conf.ini
+</span></span></code></pre></div><hr>
+<h1 id="在-gitignore-中添加文件路径使用相对路径还是绝对路径">在 .gitignore 中添加文件，路径使用相对路径还是绝对路径</h1>
+<p><strong>Cursor</strong></p>
+<h3 id="在-gitignore-中路径该怎么写">在 .gitignore 中路径该怎么写</h3>
+<ul>
+<li><strong>使用仓库相对路径</strong>：<code>.gitignore</code> 的规则是相对其所在目录匹配的（通常在项目根目录）。不是操作系统的“绝对路径”。</li>
+<li><strong>用开头的斜杠表示锚定仓库根</strong>：<code>/</code> 表示从仓库根开始匹配，而不是文件系统根。</li>
+<li><strong>不要用 ./ 前缀</strong>：<code>./conf/conf.ini</code> 不符合 <code>.gitignore</code> 语法，通常不会匹配，避免使用。</li>
+<li><strong>斜杠与通配说明</strong>：
+<ul>
+<li><code>conf/conf.ini</code>：匹配任意层级中名为 <code>conf/conf.ini</code> 的路径</li>
+<li><code>/conf/conf.ini</code>：只匹配仓库根下的 <code>conf/conf.ini</code></li>
+<li><code>conf/</code>：匹配任意层级名为 <code>conf</code> 的目录</li>
+<li><code>/conf/</code>：只匹配仓库根下的 <code>conf</code> 目录</li>
+<li><code>**/conf.ini</code>：匹配任意目录下的 <code>conf.ini</code></li>
+<li><code>!/path</code>：取消忽略某个路径</li>
+</ul>
+</li>
+</ul>
+<h3 id="建议写法你的场景">建议写法（你的场景）</h3>
+<ul>
+<li>在项目根的 <code>.gitignore</code> 中忽略根下的 <code>conf/conf.ini</code>：
+<pre tabindex="0"><code></code></pre></li>
+</ul>
+<p>/conf/conf.ini</p>
+<pre tabindex="0"><code>
+- 若只想忽略整个 `conf` 目录（根下）：
+</code></pre><p>/conf/</p>
+<pre tabindex="0"><code>
+- 不要写：
+</code></pre><p>./conf/conf.ini</p>
+<pre tabindex="0"><code>
+- 若放在子目录的 `.gitignore` 中，规则会相对于该子目录生效。
+
+- - -
+- 关键点
+- 规则为“仓库相对路径”，而非系统绝对路径
+- 用 `/` 锚定仓库根；不要用 `./`
+- 你的场景推荐 `/conf/conf.ini`
+
+```plaintext
+/conf/conf.ini
+</code></pre><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-plaintext" data-lang="plaintext"><span style="display:flex;"><span>/conf/
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-plaintext" data-lang="plaintext"><span style="display:flex;"><span>./conf/conf.ini
+</span></span></code></pre></div></div>
+    </article>
+  </main>
+
+      </div>
+      <footer>
+  <hr />
+  
+  <p class="copyright">
+    Copyright © 2025
+    <a href="http://localhost:1313/"><strong>Blog Author</strong></a>.
+    This work is licensed under the
+    <a href="http://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a> license.
+  </p>
+  <p class="builtWith">
+    Built with
+    <a href="http://www.gohugo.io/">Hugo</a>,
+    using the theme
+    <a href="https://gitlab.com/ian-s-mcb/smigle-hugo-theme">smigle</a>,
+    which was influenced by the theme
+    <a href="https://github.com/sumnerevans/smol">smol</a>.
+  </p>
+</footer>
+
+    </div>
+  </body>
+</html>
