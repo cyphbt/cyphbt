@@ -4,9 +4,6 @@ draft = false
 title = 'Go singleflight 源码分析    '
 +++
 
-# Go singleflight 源码分析
-_Exported on 8/7/2025 at 17:36:54 GMT+8 from Cursor (1.3.9)_
-
 ---
 
 **User**
