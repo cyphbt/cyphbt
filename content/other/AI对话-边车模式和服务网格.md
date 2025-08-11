@@ -1,7 +1,7 @@
 +++
 date = '2025-08-11T16:41:26+08:00'
-draft = true
-title = '边车模式和服务网格'
+draft = false
+title = 'AI对话-边车模式和服务网格'
 +++
 
 User: 服务网格和边车模式什么意思
