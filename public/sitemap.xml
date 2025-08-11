@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://mofan.life/</loc>
+    <lastmod>2025-08-11T15:00:02+08:00</lastmod>
+  </url><url>
+    <loc>https://mofan.life/posts/</loc>
+    <lastmod>2025-08-11T15:00:02+08:00</lastmod>
+  </url><url>
+    <loc>https://mofan.life/categories/</loc>
+  </url><url>
+    <loc>https://mofan.life/tags/</loc>
+  </url>
+</urlset>

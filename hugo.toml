@@ -1,0 +1,7 @@
+baseURL = 'https://mofan.life/'
+languageCode = 'en-us'
+title = "cyp's Blog"
+theme = 'ananke'
+[caches]
+  [caches.images]
+    dir = ':cacheDir/images'
